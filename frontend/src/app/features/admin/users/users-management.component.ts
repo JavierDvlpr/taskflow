@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { LayoutComponent } from '../../../shared/components/layout/layout.component';
+import { LoadingComponent } from '../../../shared/components/loading/loading.component';
 
 interface User {
   id: number;
@@ -29,7 +30,7 @@ interface Department {
 @Component({
   selector: 'app-users-management',
   standalone: true,
-  imports: [CommonModule, FormsModule, LayoutComponent],
+  imports: [CommonModule, FormsModule, LayoutComponent, LoadingComponent],
   template: `
     <app-layout>
     <div class="management-page">
@@ -70,8 +71,11 @@ interface Department {
         </select>
       </div>
 
+      <!-- Loading -->
+      <app-loading *ngIf="loading()" message="Cargando usuarios..."></app-loading>
+
       <!-- Users Table -->
-      <div class="table-container">
+      <div class="table-container" *ngIf="!loading()">
         <table class="data-table">
           <thead>
             <tr>
@@ -535,6 +539,7 @@ export class UsersManagementComponent implements OnInit {
   users = signal<User[]>([]);
   filteredUsers = signal<User[]>([]);
   departments = signal<Department[]>([]);
+  loading = signal(true);
   
   showModal = signal(false);
   editingUser = signal<User | null>(null);
@@ -559,6 +564,7 @@ export class UsersManagementComponent implements OnInit {
   }
 
   loadUsers() {
+    this.loading.set(true);
     this.http.get<User[]>(`${environment.apiUrl}/users`)
       .subscribe({
         next: (data) => {
@@ -575,11 +581,13 @@ export class UsersManagementComponent implements OnInit {
           }));
           this.users.set(users);
           this.filterUsers();
+          this.loading.set(false);
         },
         error: (err) => {
           console.error('Error cargando usuarios:', err);
           this.users.set([]);
           this.filterUsers();
+          this.loading.set(false);
         }
       });
   }

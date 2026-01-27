@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { LayoutComponent } from '../../../shared/components/layout/layout.component';
+import { LoadingComponent } from '../../../shared/components/loading/loading.component';
 
 interface Department {
   id: number;
@@ -20,7 +21,7 @@ interface Department {
 @Component({
   selector: 'app-departments-management',
   standalone: true,
-  imports: [CommonModule, FormsModule, LayoutComponent],
+  imports: [CommonModule, FormsModule, LayoutComponent, LoadingComponent],
   template: `
     <app-layout>
     <div class="management-page">
@@ -39,8 +40,11 @@ interface Department {
         </button>
       </header>
 
+      <!-- Loading -->
+      <app-loading *ngIf="loading()" message="Cargando departamentos..."></app-loading>
+
       <!-- Departments Grid -->
-      <div class="departments-grid">
+      <div class="departments-grid" *ngIf="!loading()">
         <div class="department-card" *ngFor="let dept of departments()">
           <div class="card-header">
             <div class="dept-icon">
@@ -522,6 +526,7 @@ export class DepartmentsManagementComponent implements OnInit {
   private http = inject(HttpClient);
   
   departments = signal<Department[]>([]);
+  loading = signal(true);
   showModal = signal(false);
   showUsersModal = signal(false);
   editingDept = signal<Department | null>(null);
@@ -538,6 +543,7 @@ export class DepartmentsManagementComponent implements OnInit {
   }
 
   loadDepartments() {
+    this.loading.set(true);
     this.http.get<any[]>(`${environment.apiUrl}/departments`)
       .subscribe({
         next: (data) => {
@@ -548,10 +554,12 @@ export class DepartmentsManagementComponent implements OnInit {
             usersCount: d.usersCount || d.users?.length || 0
           }));
           this.departments.set(departments);
+          this.loading.set(false);
         },
         error: (err) => {
           console.error('Error al cargar departamentos:', err);
           alert('Error al cargar los departamentos');
+          this.loading.set(false);
         }
       });
   }

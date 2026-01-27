@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { LayoutComponent } from '../../../shared/components/layout/layout.component';
+import { LoadingComponent } from '../../../shared/components/loading/loading.component';
 
 interface Task {
   id: number;
@@ -39,7 +40,7 @@ interface User {
 @Component({
   selector: 'app-admin-tasks',
   standalone: true,
-  imports: [CommonModule, FormsModule, LayoutComponent],
+  imports: [CommonModule, FormsModule, LayoutComponent, LoadingComponent],
   template: `
     <app-layout>
     <div class="management-page">
@@ -109,8 +110,11 @@ interface User {
         </select>
       </div>
 
+      <!-- Loading -->
+      <app-loading *ngIf="loading()" message="Cargando tareas..."></app-loading>
+
       <!-- Tasks Table -->
-      <div class="table-container">
+      <div class="table-container" *ngIf="!loading()">
         <table class="data-table">
           <thead>
             <tr>
@@ -652,6 +656,7 @@ export class AdminTasksComponent implements OnInit {
   filteredTasks = signal<Task[]>([]);
   departments = signal<Department[]>([]);
   employees = signal<User[]>([]);
+  loading = signal(true);
   
   showModal = signal(false);
   showDetailModal = signal(false);
@@ -681,6 +686,7 @@ export class AdminTasksComponent implements OnInit {
   }
 
   loadTasks() {
+    this.loading.set(true);
     this.http.get<any[]>(`${environment.apiUrl}/tasks`)
       .subscribe({
         next: (data) => {
@@ -701,10 +707,12 @@ export class AdminTasksComponent implements OnInit {
           this.tasks.set(tasks);
           this.filterTasks();
           this.calculateStats();
+          this.loading.set(false);
         },
         error: (err) => {
           console.error('Error al cargar tareas:', err);
           alert('Error al cargar las tareas');
+          this.loading.set(false);
         }
       });
   }

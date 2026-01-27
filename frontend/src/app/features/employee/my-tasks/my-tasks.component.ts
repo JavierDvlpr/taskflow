@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { LayoutComponent } from '../../../shared/components/layout/layout.component';
+import { LoadingComponent } from '../../../shared/components/loading/loading.component';
 
 interface MyTask {
   id: number;
@@ -26,7 +27,7 @@ interface MyTask {
 @Component({
   selector: 'app-my-tasks',
   standalone: true,
-  imports: [CommonModule, FormsModule, LayoutComponent],
+  imports: [CommonModule, FormsModule, LayoutComponent, LoadingComponent],
   template: `
     <app-layout>
     <div class="my-tasks-page">
@@ -74,8 +75,11 @@ interface MyTask {
         <input type="text" placeholder="Buscar en mis tareas..." [(ngModel)]="searchTerm" (input)="filterTasks()">
       </div>
 
+      <!-- Loading -->
+      <app-loading *ngIf="loading()" message="Cargando mis tareas..."></app-loading>
+
       <!-- Tasks List -->
-      <div class="tasks-container">
+      <div class="tasks-container" *ngIf="!loading()">
         <div class="task-card" *ngFor="let task of filteredTasks()" (click)="selectTask(task)">
           <div class="task-header">
             <span class="priority-indicator" [class]="'priority-' + task.priority.toLowerCase()">
@@ -496,6 +500,7 @@ export class MyTasksComponent implements OnInit {
   tasks = signal<MyTask[]>([]);
   filteredTasks = signal<MyTask[]>([]);
   selectedTask = signal<MyTask | null>(null);
+  loading = signal(true);
   
   searchTerm = '';
   filterStatus = '';
@@ -505,6 +510,7 @@ export class MyTasksComponent implements OnInit {
   }
 
   loadTasks() {
+    this.loading.set(true);
     this.http.get<any[]>(`${environment.apiUrl}/tasks/my-tasks`)
       .subscribe({
         next: (data) => {
@@ -522,10 +528,12 @@ export class MyTasksComponent implements OnInit {
           }));
           this.tasks.set(tasks);
           this.filterTasks();
+          this.loading.set(false);
         },
         error: (err) => {
           console.error('Error al cargar mis tareas:', err);
           alert('Error al cargar las tareas');
+          this.loading.set(false);
         }
       });
   }
