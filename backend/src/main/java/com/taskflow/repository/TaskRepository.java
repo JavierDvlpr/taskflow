@@ -8,4 +8,6 @@ import java.util.List;
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByStatus(TaskStatus status);
     List<Task> findByAssigneeId(Long assigneeId);
+    List<Task> findByDepartmentId(Long departmentId);
+    long countByStatus(TaskStatus status);
 }

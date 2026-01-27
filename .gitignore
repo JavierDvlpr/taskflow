@@ -38,3 +38,11 @@ Thumbs.db
 
 # Temporary upgrade files
 backend/.github/java-upgrade/
+
+# Environment files (contienen credenciales)
+.env
+*.env.local
+
+# Archivos de logs
+logs/
+*.log

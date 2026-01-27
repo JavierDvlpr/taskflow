@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Servicio para gestionar la lógica de las tareas.
@@ -27,9 +29,17 @@ public class TaskService {
     @Transactional
     public Task createTask(Task task) {
         if (task.getStatus() == null) {
-            task.setStatus(TaskStatus.PENDIENTE);
+            task.setStatus(TaskStatus.PENDING);
         }
         return taskRepository.save(task);
+    }
+
+    /**
+     * Obtiene todas las tareas.
+     */
+    @Transactional(readOnly = true)
+    public List<Task> getAllTasks() {
+        return taskRepository.findAll();
     }
 
     /**
@@ -42,18 +52,37 @@ public class TaskService {
     }
 
     /**
+     * Actualiza una tarea.
+     */
+    @Transactional
+    public Task updateTask(Long id, Task taskDetails) {
+        Task task = getTaskById(id);
+        task.setTitle(taskDetails.getTitle());
+        task.setDescription(taskDetails.getDescription());
+        task.setStatus(taskDetails.getStatus());
+        task.setPriority(taskDetails.getPriority());
+        task.setDepartment(taskDetails.getDepartment());
+        task.setAssignee(taskDetails.getAssignee());
+        return taskRepository.save(task);
+    }
+
+    /**
+     * Elimina una tarea.
+     */
+    @Transactional
+    public void deleteTask(Long id) {
+        Task task = getTaskById(id);
+        taskRepository.delete(task);
+    }
+
+    /**
      * Inicia una tarea y el contador de tiempo.
      */
     @Transactional
     public Task startTask(Long taskId, User user) {
         Task task = getTaskById(taskId);
         
-        // RF6.2: No se debe permitir iniciar una tarea que ya esté en progreso
-        if (task.getStatus() == TaskStatus.EN_PROGRESO) {
-            // Sin embargo, si es el mismo usuario reasumiendo, ya se maneja en TimeLogService
-        }
-
-        task.setStatus(TaskStatus.EN_PROGRESO);
+        task.setStatus(TaskStatus.IN_PROGRESS);
         task.setAssignee(user);
         
         timeLogService.startTimeLog(user, task);
@@ -67,7 +96,7 @@ public class TaskService {
     @Transactional
     public Task pauseTask(Long taskId, User user) {
         Task task = getTaskById(taskId);
-        task.setStatus(TaskStatus.PAUSADA);
+        task.setStatus(TaskStatus.PENDING);
         
         timeLogService.stopTimeLog(user);
         
@@ -82,11 +111,11 @@ public class TaskService {
         Task task = getTaskById(taskId);
         
         // Si estaba en progreso, detener el tiempo antes de marcar como completada
-        if (task.getStatus() == TaskStatus.EN_PROGRESO) {
+        if (task.getStatus() == TaskStatus.IN_PROGRESS) {
             timeLogService.stopTimeLog(user);
         }
         
-        task.setStatus(TaskStatus.COMPLETADA);
+        task.setStatus(TaskStatus.COMPLETED);
         return taskRepository.save(task);
     }
 
@@ -95,9 +124,27 @@ public class TaskService {
      */
     @Transactional(readOnly = true)
     public List<Task> getTasksByDepartment(Long departmentId) {
-        // Podríamos agregar más filtros en el repositorio
-        return taskRepository.findAll().stream()
-                .filter(t -> t.getDepartment().getId().equals(departmentId))
-                .toList();
+        return taskRepository.findByDepartmentId(departmentId);
+    }
+
+    /**
+     * Lista tareas asignadas a un usuario.
+     */
+    @Transactional(readOnly = true)
+    public List<Task> getTasksByAssignee(Long assigneeId) {
+        return taskRepository.findByAssigneeId(assigneeId);
+    }
+
+    /**
+     * Obtiene estadísticas de tareas.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getTaskStats() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total", taskRepository.count());
+        stats.put("pending", taskRepository.countByStatus(TaskStatus.PENDING));
+        stats.put("inProgress", taskRepository.countByStatus(TaskStatus.IN_PROGRESS));
+        stats.put("completed", taskRepository.countByStatus(TaskStatus.COMPLETED));
+        return stats;
     }
 }

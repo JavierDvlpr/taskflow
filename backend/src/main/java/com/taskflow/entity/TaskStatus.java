@@ -1,8 +1,8 @@
 package com.taskflow.entity;
 
 public enum TaskStatus {
-    PENDIENTE,
-    EN_PROGRESO,
-    PAUSADA,
-    COMPLETADA
+    PENDING,
+    IN_PROGRESS,
+    PAUSED,
+    COMPLETED
 }

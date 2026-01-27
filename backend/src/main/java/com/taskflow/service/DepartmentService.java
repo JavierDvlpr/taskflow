@@ -33,4 +33,23 @@ public class DepartmentService {
         return departmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Departamento no encontrado con ID: " + id));
     }
+
+    @Transactional
+    public Department updateDepartment(Long id, Department departmentDetails) {
+        Department department = getDepartmentById(id);
+        department.setName(departmentDetails.getName());
+        department.setDescription(departmentDetails.getDescription());
+        return departmentRepository.save(department);
+    }
+
+    @Transactional
+    public void deleteDepartment(Long id) {
+        Department department = getDepartmentById(id);
+        departmentRepository.delete(department);
+    }
+
+    @Transactional(readOnly = true)
+    public long getDepartmentCount() {
+        return departmentRepository.count();
+    }
 }
