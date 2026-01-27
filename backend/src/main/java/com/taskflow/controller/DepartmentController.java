@@ -1,5 +1,6 @@
 package com.taskflow.controller;
 
+import com.taskflow.dto.DepartmentResponse;
 import com.taskflow.entity.Department;
 import com.taskflow.entity.User;
 import com.taskflow.service.DepartmentService;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Controlador para la gestión de departamentos.
@@ -35,19 +37,46 @@ public class DepartmentController {
     }
 
     /**
-     * Obtener todos los departamentos
+     * Obtener todos los departamentos con sus usuarios
      */
     @GetMapping
-    public ResponseEntity<List<Department>> getAllDepartments() {
-        return ResponseEntity.ok(departmentService.getAllDepartments());
+    public ResponseEntity<List<DepartmentResponse>> getAllDepartments() {
+        List<Department> departments = departmentService.getAllDepartments();
+        List<DepartmentResponse> response = departments.stream()
+                .map(dept -> {
+                    List<User> users = userService.getUsersByDepartment(dept.getId());
+                    List<DepartmentResponse.UserSummary> userSummaries = users.stream()
+                            .map(u -> DepartmentResponse.UserSummary.builder()
+                                    .id(u.getId())
+                                    .firstName(u.getFirstName())
+                                    .lastName(u.getLastName())
+                                    .email(u.getEmail())
+                                    .role(u.getRole().name())
+                                    .build())
+                            .collect(Collectors.toList());
+                    return DepartmentResponse.fromEntity(dept, userSummaries);
+                })
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Obtener departamento por ID
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Department> getDepartmentById(@PathVariable Long id) {
-        return ResponseEntity.ok(departmentService.getDepartmentById(id));
+    public ResponseEntity<DepartmentResponse> getDepartmentById(@PathVariable Long id) {
+        Department dept = departmentService.getDepartmentById(id);
+        List<User> users = userService.getUsersByDepartment(id);
+        List<DepartmentResponse.UserSummary> userSummaries = users.stream()
+                .map(u -> DepartmentResponse.UserSummary.builder()
+                        .id(u.getId())
+                        .firstName(u.getFirstName())
+                        .lastName(u.getLastName())
+                        .email(u.getEmail())
+                        .role(u.getRole().name())
+                        .build())
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(DepartmentResponse.fromEntity(dept, userSummaries));
     }
 
     /**

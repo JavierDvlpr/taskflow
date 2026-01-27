@@ -514,8 +514,8 @@ export class MyTasksComponent implements OnInit {
             description: t.description || '',
             status: t.status,
             priority: t.priority,
-            requesterName: 'Admin',
-            departmentName: t.department?.name || 'Sin departamento',
+            requesterName: t.requesterFirstName ? `${t.requesterFirstName} ${t.requesterLastName}` : 'Admin',
+            departmentName: t.departmentName || 'Sin departamento',
             dueDate: t.dueDate,
             timeLogged: t.totalTimeLogged || 0,
             createdAt: t.createdAt

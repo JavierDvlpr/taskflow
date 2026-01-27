@@ -1,5 +1,6 @@
 package com.taskflow.controller;
 
+import com.taskflow.dto.TaskResponse;
 import com.taskflow.entity.Task;
 import com.taskflow.entity.User;
 import com.taskflow.service.TaskService;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 
 /**
  * Controlador para la gestión de tareas.
@@ -40,16 +42,21 @@ public class TaskController {
      * Obtener todas las tareas
      */
     @GetMapping
-    public ResponseEntity<List<Task>> getAllTasks() {
-        return ResponseEntity.ok(taskService.getAllTasks());
+    public ResponseEntity<List<TaskResponse>> getAllTasks() {
+        List<Task> tasks = taskService.getAllTasks();
+        List<TaskResponse> response = tasks.stream()
+                .map(TaskResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Obtener tarea por ID
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Task> getTaskById(@PathVariable Long id) {
-        return ResponseEntity.ok(taskService.getTaskById(id));
+    public ResponseEntity<TaskResponse> getTaskById(@PathVariable Long id) {
+        Task task = taskService.getTaskById(id);
+        return ResponseEntity.ok(TaskResponse.fromEntity(task));
     }
 
     /**
@@ -75,44 +82,55 @@ public class TaskController {
      * Obtener tareas por departamento
      */
     @GetMapping("/department/{deptId}")
-    public ResponseEntity<List<Task>> getByDepartment(@PathVariable Long deptId) {
-        return ResponseEntity.ok(taskService.getTasksByDepartment(deptId));
+    public ResponseEntity<List<TaskResponse>> getByDepartment(@PathVariable Long deptId) {
+        List<Task> tasks = taskService.getTasksByDepartment(deptId);
+        List<TaskResponse> response = tasks.stream()
+                .map(TaskResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Obtener MIS tareas (del usuario actual)
      */
     @GetMapping("/my-tasks")
-    public ResponseEntity<List<Task>> getMyTasks(Authentication auth) {
+    public ResponseEntity<List<TaskResponse>> getMyTasks(Authentication auth) {
         User user = userService.getUserByEmail(auth.getName());
-        return ResponseEntity.ok(taskService.getTasksByAssignee(user.getId()));
+        List<Task> tasks = taskService.getTasksByAssignee(user.getId());
+        List<TaskResponse> response = tasks.stream()
+                .map(TaskResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Iniciar contador de tiempo para una tarea.
      */
     @PostMapping("/{taskId}/start")
-    public ResponseEntity<Task> startTask(@PathVariable Long taskId, @AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<TaskResponse> startTask(@PathVariable Long taskId, @AuthenticationPrincipal UserDetails userDetails) {
         User user = userService.getUserByEmail(userDetails.getUsername());
-        return ResponseEntity.ok(taskService.startTask(taskId, user));
+        Task task = taskService.startTask(taskId, user);
+        return ResponseEntity.ok(TaskResponse.fromEntity(task));
     }
 
     /**
      * Pausar contador de tiempo.
      */
     @PostMapping("/{taskId}/pause")
-    public ResponseEntity<Task> pauseTask(@PathVariable Long taskId, @AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<TaskResponse> pauseTask(@PathVariable Long taskId, @AuthenticationPrincipal UserDetails userDetails) {
         User user = userService.getUserByEmail(userDetails.getUsername());
-        return ResponseEntity.ok(taskService.pauseTask(taskId, user));
+        Task task = taskService.pauseTask(taskId, user);
+        return ResponseEntity.ok(TaskResponse.fromEntity(task));
     }
 
     /**
      * Completar tarea.
      */
     @PostMapping("/{taskId}/complete")
-    public ResponseEntity<Task> completeTask(@PathVariable Long taskId, @AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<TaskResponse> completeTask(@PathVariable Long taskId, @AuthenticationPrincipal UserDetails userDetails) {
         User user = userService.getUserByEmail(userDetails.getUsername());
-        return ResponseEntity.ok(taskService.completeTask(taskId, user));
+        Task task = taskService.completeTask(taskId, user);
+        return ResponseEntity.ok(TaskResponse.fromEntity(task));
     }
 
     /**
