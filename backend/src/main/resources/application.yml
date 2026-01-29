@@ -19,6 +19,11 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  jackson:
+    serialization:
+      fail-on-empty-beans: false
+    mapper:
+      default-view-inclusion: true
 
 server:
   port: 8081
@@ -26,6 +31,10 @@ server:
 jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000 # 24h
+
+logging:
+  level:
+    com.taskflow.security: DEBUG
 
 # Límites de la aplicación
 app:

@@ -422,15 +422,10 @@ export class LayoutComponent {
     return this.currentUser()?.role === 'EMPLOYEE';
   }
 
-  isManager(): boolean {
-    return this.currentUser()?.role === 'MANAGER';
-  }
-
   getRoleName(): string {
     const role = this.currentUser()?.role;
     switch (role) {
       case 'ADMIN': return 'Administrador';
-      case 'MANAGER': return 'Gerente';
       case 'EMPLOYEE': return 'Empleado';
       default: return role || '';
     }

@@ -523,27 +523,35 @@ export class MyHistoryComponent implements OnInit {
   }
 
   loadHistory() {
-    this.http.get<any[]>(`${environment.apiUrl}/time-logs/my-history`, {
-      params: { from: this.dateFrom, to: this.dateTo }
-    }).subscribe({
-      next: (data) => {
-        const entries = data.map(e => ({
-          id: e.id,
-          date: e.startTime ? e.startTime.split('T')[0] : new Date().toISOString().split('T')[0],
-          taskId: e.task?.id || 0,
-          taskTitle: e.task?.title || 'Tarea',
-          startTime: e.startTime,
-          endTime: e.endTime,
-          duration: e.duration ? e.duration / 60 : 0, // minutos a horas
-          comment: e.description || ''
-        }));
-        this.history.set(entries);
-        this.groupByDay(entries);
-      },
-      error: (err) => {
-        console.error('Error al cargar historial:', err);
-      }
-    });
+    this.http.get<any[]>(`${environment.apiUrl}/time-logs/my-history`)
+      .subscribe({
+        next: (data) => {
+          const entries = data
+            .filter(e => {
+              // Filtrar por fechas si están definidas
+              if (!this.dateFrom || !this.dateTo) return true;
+              const entryDate = e.startTime ? e.startTime.split('T')[0] : '';
+              return entryDate >= this.dateFrom && entryDate <= this.dateTo;
+            })
+            .filter(e => e.endTime) // Solo mostrar registros finalizados
+            .map(e => ({
+              id: e.id,
+              date: e.startTime ? e.startTime.split('T')[0] : new Date().toISOString().split('T')[0],
+              taskId: e.task?.id || 0,
+              taskTitle: e.task?.title || 'Tarea',
+              startTime: e.startTime,
+              endTime: e.endTime,
+              duration: e.durationMinutes ? e.durationMinutes / 60 : 0, // minutos a horas
+              comment: ''
+            }));
+          this.history.set(entries);
+          this.groupByDay(entries);
+          this.loadWeeklyChart();
+        },
+        error: (err) => {
+          console.error('Error al cargar historial:', err);
+        }
+      });
   }
 
   groupByDay(entries: HistoryEntry[]) {

@@ -11,7 +11,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
+  role: 'ADMIN' | 'EMPLOYEE';
   departmentId?: number;
   departmentName?: string;
   active: boolean;
@@ -61,7 +61,6 @@ interface Department {
         <select [(ngModel)]="filterRole" (change)="filterUsers()" class="filter-select">
           <option value="">Todos los roles</option>
           <option value="ADMIN">Administrador</option>
-          <option value="MANAGER">Gerente</option>
           <option value="EMPLOYEE">Empleado</option>
         </select>
         <select [(ngModel)]="filterStatus" (change)="filterUsers()" class="filter-select">
@@ -170,7 +169,6 @@ interface Department {
                 <label>Rol</label>
                 <select [(ngModel)]="userForm.role" name="role" required>
                   <option value="EMPLOYEE">Empleado</option>
-                  <option value="MANAGER">Gerente</option>
                   <option value="ADMIN">Administrador</option>
                 </select>
               </div>
@@ -553,7 +551,7 @@ export class UsersManagementComponent implements OnInit {
     lastName: '',
     email: '',
     password: '',
-    role: 'EMPLOYEE' as 'ADMIN' | 'MANAGER' | 'EMPLOYEE',
+    role: 'EMPLOYEE' as 'ADMIN' | 'EMPLOYEE',
     departmentId: null as number | null,
     active: true
   };
@@ -631,7 +629,6 @@ export class UsersManagementComponent implements OnInit {
   getRoleName(role: string): string {
     switch (role) {
       case 'ADMIN': return 'Administrador';
-      case 'MANAGER': return 'Gerente';
       case 'EMPLOYEE': return 'Empleado';
       default: return role;
     }

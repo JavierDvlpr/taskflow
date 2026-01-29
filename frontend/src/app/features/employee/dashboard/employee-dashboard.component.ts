@@ -39,7 +39,7 @@ interface DashboardStats {
       <!-- Welcome Header -->
       <header class="welcome-header">
         <div class="welcome-text">
-          <h1>¡Hola, {{ userName() }}! 👋</h1>
+          <h1>¡Hola, {{ userName() }}! </h1>
           <p>{{ getGreeting() }}</p>
         </div>
         <div class="date-display">
@@ -588,7 +588,36 @@ export class EmployeeDashboardComponent implements OnInit {
   });
 
   ngOnInit() {
+    this.checkBackendActiveSession();
     this.loadDashboard();
+  }
+  /**
+   * Consulta al backend si hay una tarea activa o pausada y actualiza el banner
+   */
+  checkBackendActiveSession() {
+    this.http.get<any>(`${environment.apiUrl}/time-logs/active`).subscribe({
+      next: (data) => {
+        if (data.active && data.timeLog && data.timeLog.task) {
+          const t = data.timeLog.task;
+          this.stats.set({
+            ...this.stats(),
+            activeTask: {
+              id: t.id,
+              title: t.title,
+              status: t.status,
+              priority: t.priority,
+              timeLogged: (t.totalTimeLogged || 0) / 60,
+              isActive: t.status === 'IN_PROGRESS'
+            }
+          });
+        } else {
+          this.stats.set({ ...this.stats(), activeTask: null });
+        }
+      },
+      error: () => {
+        this.stats.set({ ...this.stats(), activeTask: null });
+      }
+    });
   }
 
   loadDashboard() {
@@ -613,7 +642,7 @@ export class EmployeeDashboardComponent implements OnInit {
               title: activeTask.title,
               status: activeTask.status,
               priority: activeTask.priority,
-              timeLogged: activeTask.totalTimeLogged || 0,
+              timeLogged: (activeTask.totalTimeLogged || 0) / 60, // Convertir minutos a horas
               isActive: true
             } : null
           });
@@ -624,7 +653,7 @@ export class EmployeeDashboardComponent implements OnInit {
             title: t.title,
             status: t.status,
             priority: t.priority,
-            timeLogged: t.totalTimeLogged || 0,
+            timeLogged: (t.totalTimeLogged || 0) / 60, // Convertir minutos a horas
             isActive: t.status === 'IN_PROGRESS'
           }));
           this.recentTasks.set(recentTasks);

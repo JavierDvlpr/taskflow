@@ -648,7 +648,6 @@ export class DepartmentsManagementComponent implements OnInit {
   getRoleName(role: string): string {
     switch (role) {
       case 'ADMIN': return 'Admin';
-      case 'MANAGER': return 'Gerente';
       case 'EMPLOYEE': return 'Empleado';
       default: return role;
     }

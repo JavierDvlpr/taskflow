@@ -1,10 +1,13 @@
 package com.taskflow.service;
 
+import com.taskflow.entity.Department;
 import com.taskflow.entity.Task;
 import com.taskflow.entity.TaskStatus;
 import com.taskflow.entity.User;
 import com.taskflow.exception.ResourceNotFoundException;
+import com.taskflow.repository.DepartmentRepository;
 import com.taskflow.repository.TaskRepository;
+import com.taskflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,15 +25,33 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final TimeLogService timeLogService;
+    private final DepartmentRepository departmentRepository;
+    private final UserRepository userRepository;
 
     /**
      * Crea una nueva tarea.
+     * Resuelve las referencias a department y assignee desde la BD.
      */
     @Transactional
     public Task createTask(Task task) {
         if (task.getStatus() == null) {
             task.setStatus(TaskStatus.PENDING);
         }
+        
+        // Resolver departamento desde la BD
+        if (task.getDepartment() != null && task.getDepartment().getId() != null) {
+            Department dept = departmentRepository.findById(task.getDepartment().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Departamento no encontrado"));
+            task.setDepartment(dept);
+        }
+        
+        // Resolver assignee desde la BD (puede ser null)
+        if (task.getAssignee() != null && task.getAssignee().getId() != null) {
+            User assignee = userRepository.findById(task.getAssignee().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario asignado no encontrado"));
+            task.setAssignee(assignee);
+        }
+        
         return taskRepository.save(task);
     }
 
@@ -53,6 +74,7 @@ public class TaskService {
 
     /**
      * Actualiza una tarea.
+     * Resuelve las referencias a department y assignee desde la BD.
      */
     @Transactional
     public Task updateTask(Long id, Task taskDetails) {
@@ -61,8 +83,23 @@ public class TaskService {
         task.setDescription(taskDetails.getDescription());
         task.setStatus(taskDetails.getStatus());
         task.setPriority(taskDetails.getPriority());
-        task.setDepartment(taskDetails.getDepartment());
-        task.setAssignee(taskDetails.getAssignee());
+        
+        // Resolver departamento desde la BD
+        if (taskDetails.getDepartment() != null && taskDetails.getDepartment().getId() != null) {
+            Department dept = departmentRepository.findById(taskDetails.getDepartment().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Departamento no encontrado"));
+            task.setDepartment(dept);
+        }
+        
+        // Resolver assignee desde la BD (puede ser null)
+        if (taskDetails.getAssignee() != null && taskDetails.getAssignee().getId() != null) {
+            User assignee = userRepository.findById(taskDetails.getAssignee().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario asignado no encontrado"));
+            task.setAssignee(assignee);
+        } else {
+            task.setAssignee(null);
+        }
+        
         return taskRepository.save(task);
     }
 
@@ -105,14 +142,17 @@ public class TaskService {
 
     /**
      * Completa una tarea.
+     * Si hay un time log activo, lo cierra automáticamente.
      */
     @Transactional
     public Task completeTask(Long taskId, User user) {
         Task task = getTaskById(taskId);
         
-        // Si estaba en progreso, detener el tiempo antes de marcar como completada
-        if (task.getStatus() == TaskStatus.IN_PROGRESS) {
+        // Intentar detener el tiempo si hay uno activo (no fallar si no hay)
+        try {
             timeLogService.stopTimeLog(user);
+        } catch (Exception e) {
+            // No hay time log activo, está bien continuar
         }
         
         task.setStatus(TaskStatus.COMPLETED);

@@ -1,12 +1,15 @@
 package com.taskflow.controller;
 
 import com.taskflow.entity.Task;
+import com.taskflow.entity.TaskStatus;
 import com.taskflow.entity.TimeLog;
 import com.taskflow.entity.User;
+import com.taskflow.repository.TaskRepository;
 import com.taskflow.repository.TimeLogRepository;
 import com.taskflow.service.TaskService;
 import com.taskflow.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -23,43 +26,71 @@ import java.util.Optional;
 /**
  * Controlador para el registro de tiempo.
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/time-logs")
 @RequiredArgsConstructor
 public class TimeLogController {
 
     private final TimeLogRepository timeLogRepository;
+    private final TaskRepository taskRepository;
     private final UserService userService;
     private final TaskService taskService;
 
     /**
-     * Iniciar registro de tiempo en una tarea
+     * Iniciar registro de tiempo en una tarea.
+     * También cambia el estado de la tarea a IN_PROGRESS.
      */
     @PostMapping("/start/{taskId}")
     public ResponseEntity<?> startTimeLog(@PathVariable Long taskId, Authentication auth) {
+        log.info("========================================");
+        log.info("POST /api/time-logs/start/{}", taskId);
+        log.info("Authentication: {}", auth != null ? auth.getName() : "NULL");
+        log.info("Authorities: {}", auth != null ? auth.getAuthorities() : "NULL");
+        
+        if (auth == null) {
+            log.error("✗ Authentication is NULL - User not authenticated!");
+            return ResponseEntity.status(403).body(Map.of("error", "No autenticado"));
+        }
+        
         User user = userService.getUserByEmail(auth.getName());
+        log.info("User found: {} (ID: {})", user.getEmail(), user.getId());
         
         // Verificar si ya tiene una tarea activa
         Optional<TimeLog> activeLog = timeLogRepository.findByUserIdAndEndTimeIsNull(user.getId());
         if (activeLog.isPresent()) {
+            log.warn("User {} already has an active task", user.getEmail());
             Map<String, String> error = new HashMap<>();
             error.put("error", "Ya tienes una tarea en progreso. Finalízala primero.");
             return ResponseEntity.badRequest().body(error);
         }
         
         Task task = taskService.getTaskById(taskId);
+        log.info("Task found: {} (ID: {})", task.getTitle(), task.getId());
         
-        TimeLog log = TimeLog.builder()
+        // Cambiar estado de la tarea a IN_PROGRESS
+        task.setStatus(TaskStatus.IN_PROGRESS);
+        task.setAssignee(user);
+        taskRepository.save(task);
+        log.info("Task status changed to IN_PROGRESS");
+        
+        // Crear el time log
+        TimeLog timeLog = TimeLog.builder()
                 .user(user)
                 .task(task)
                 .startTime(LocalDateTime.now())
                 .build();
         
-        return ResponseEntity.ok(timeLogRepository.save(log));
+        TimeLog savedLog = timeLogRepository.save(timeLog);
+        log.info("✓ TimeLog created successfully (ID: {})", savedLog.getId());
+        log.info("========================================");
+        
+        return ResponseEntity.ok(savedLog);
     }
 
     /**
-     * Detener registro de tiempo activo
+     * Detener registro de tiempo activo.
+     * La tarea vuelve a estado PENDING para que pueda reiniciarse.
      */
     @PostMapping("/stop")
     public ResponseEntity<?> stopTimeLog(Authentication auth, @RequestBody(required = false) Map<String, String> body) {
@@ -79,7 +110,17 @@ public class TimeLogController {
         long minutes = Duration.between(log.getStartTime(), log.getEndTime()).toMinutes();
         log.setDurationMinutes(minutes);
         
-        return ResponseEntity.ok(timeLogRepository.save(log));
+        // Guardar el time log
+        TimeLog savedLog = timeLogRepository.save(log);
+        
+        // Actualizar la tarea a PENDING (pausada, no completada)
+        Task task = log.getTask();
+        if (task != null && task.getStatus() == TaskStatus.IN_PROGRESS) {
+            task.setStatus(TaskStatus.PENDING);
+            taskRepository.save(task);
+        }
+        
+        return ResponseEntity.ok(savedLog);
     }
 
     /**
@@ -167,5 +208,70 @@ public class TimeLogController {
     @GetMapping("/task/{taskId}")
     public ResponseEntity<List<TimeLog>> getTaskTimeLogs(@PathVariable Long taskId) {
         return ResponseEntity.ok(timeLogRepository.findByTaskId(taskId));
+    }
+
+    /**
+     * Cancelar sesión activa sin guardar tiempo.
+     * Útil para recuperarse de estados inconsistentes.
+     */
+    @DeleteMapping("/cancel-active")
+    public ResponseEntity<?> cancelActiveSession(Authentication auth) {
+        User user = userService.getUserByEmail(auth.getName());
+        
+        Optional<TimeLog> activeLog = timeLogRepository.findByUserIdAndEndTimeIsNull(user.getId());
+        if (activeLog.isEmpty()) {
+            return ResponseEntity.ok(Map.of("message", "No hay sesión activa para cancelar"));
+        }
+        
+        TimeLog log = activeLog.get();
+        
+        // Restaurar la tarea a PENDING
+        Task task = log.getTask();
+        if (task != null && task.getStatus() == TaskStatus.IN_PROGRESS) {
+            task.setStatus(TaskStatus.PENDING);
+            taskRepository.save(task);
+        }
+        
+        // Eliminar el time log incompleto
+        timeLogRepository.delete(log);
+        
+        return ResponseEntity.ok(Map.of("message", "Sesión activa cancelada correctamente"));
+    }
+
+    /**
+     * Forzar cierre de sesión activa guardando el tiempo transcurrido.
+     * Útil cuando el frontend pierde sincronización.
+     */
+    @PostMapping("/force-stop")
+    public ResponseEntity<?> forceStopSession(Authentication auth) {
+        User user = userService.getUserByEmail(auth.getName());
+        
+        Optional<TimeLog> activeLog = timeLogRepository.findByUserIdAndEndTimeIsNull(user.getId());
+        if (activeLog.isEmpty()) {
+            return ResponseEntity.ok(Map.of("message", "No hay sesión activa"));
+        }
+        
+        TimeLog log = activeLog.get();
+        log.setEndTime(LocalDateTime.now());
+        
+        // Calcular duración en minutos
+        long minutes = Duration.between(log.getStartTime(), log.getEndTime()).toMinutes();
+        log.setDurationMinutes(minutes);
+        
+        // Guardar el time log
+        TimeLog savedLog = timeLogRepository.save(log);
+        
+        // Actualizar la tarea a PENDING
+        Task task = log.getTask();
+        if (task != null) {
+            task.setStatus(TaskStatus.PENDING);
+            taskRepository.save(task);
+        }
+        
+        return ResponseEntity.ok(Map.of(
+            "message", "Sesión cerrada correctamente",
+            "minutesLogged", minutes,
+            "timeLog", savedLog
+        ));
     }
 }

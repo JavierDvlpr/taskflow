@@ -523,7 +523,7 @@ export class MyTasksComponent implements OnInit {
             requesterName: t.requesterFirstName ? `${t.requesterFirstName} ${t.requesterLastName}` : 'Admin',
             departmentName: t.departmentName || 'Sin departamento',
             dueDate: t.dueDate,
-            timeLogged: t.totalTimeLogged || 0,
+            timeLogged: (t.totalTimeLogged || 0) / 60, // Convertir minutos a horas
             createdAt: t.createdAt
           }));
           this.tasks.set(tasks);

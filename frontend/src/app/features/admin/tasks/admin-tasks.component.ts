@@ -732,7 +732,7 @@ export class AdminTasksComponent implements OnInit {
       .subscribe({
         next: (data) => {
           const employees = data
-            .filter(u => u.role === 'EMPLOYEE' || u.role === 'MANAGER')
+            .filter(u => u.role === 'EMPLOYEE')
             .map(u => ({
               id: u.id,
               firstName: u.firstName,

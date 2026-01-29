@@ -93,16 +93,26 @@ import { AuthService } from '../../../core/services/auth.service';
           </button>
         </form>
 
-        <!-- Info para obtener acceso -->
+        <!-- Credenciales de prueba -->
         <div class="auth-footer">
-          <p class="access-info">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-            Contacta al administrador para obtener tus credenciales
-          </p>
+          <div class="test-credentials">
+            <div class="credentials-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              <span>Credenciales de Administrador</span>
+            </div>
+            <div class="credentials-body">
+              <div class="credential-item">
+                <span class="label">Email:</span>
+                <code>admin&#64;taskflow.com</code>
+              </div>
+              <div class="credential-item">
+                <span class="label">Password:</span>
+                <code>admin123</code>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -289,26 +299,54 @@ import { AuthService } from '../../../core/services/auth.service';
       border-top: 1px solid #e5e7eb;
     }
 
-    .auth-footer p {
-      color: #6b7280;
-      font-size: 0.875rem;
+    .test-credentials {
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      border: 1px solid #86efac;
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: left;
     }
 
-    .auth-footer .access-info {
+    .credentials-header {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 0.5rem;
-      color: #6b7280;
-      font-size: 0.8rem;
-      background: #f3f4f6;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
+      color: #166534;
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
     }
 
-    .auth-footer .access-info svg {
-      color: #9ca3af;
-      flex-shrink: 0;
+    .credentials-header svg {
+      color: #22c55e;
+    }
+
+    .credentials-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .credential-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .credential-item .label {
+      color: #4b5563;
+      min-width: 70px;
+    }
+
+    .credential-item code {
+      background: white;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      font-family: 'Monaco', 'Consolas', monospace;
+      color: #7c3aed;
+      font-weight: 500;
+      border: 1px solid #e5e7eb;
     }
 
     /* Decoración de fondo */

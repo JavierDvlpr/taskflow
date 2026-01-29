@@ -82,6 +82,13 @@ interface TimeEntry {
               </svg>
               Finalizar Sesión
             </button>
+            <button class="btn btn-cancel" (click)="cancelActiveSession()" title="Cancelar sin guardar tiempo">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+              Cancelar
+            </button>
           </div>
 
           <div class="timer-accumulated">
@@ -353,6 +360,17 @@ interface TimeEntry {
 
     .btn-finish:hover {
       background: rgba(0,0,0,0.3);
+    }
+
+    .btn-cancel {
+      background: rgba(220,53,69,0.3);
+      color: white;
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+    }
+
+    .btn-cancel:hover {
+      background: rgba(220,53,69,0.5);
     }
 
     .timer-accumulated {
@@ -714,9 +732,39 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
   private sessionStartTime: Date | null = null;
 
   ngOnInit() {
+    this.checkBackendActiveSession();
     this.loadTasks();
     this.loadTodayEntries();
-    this.checkActiveSession();
+  }
+  /**
+   * Consulta al backend si hay una tarea activa o pausada
+   */
+  checkBackendActiveSession() {
+    this.http.get<any>(`${environment.apiUrl}/time-logs/active`).subscribe({
+      next: (data) => {
+        if (data.active && data.timeLog && data.timeLog.task) {
+          const t = data.timeLog.task;
+          this.activeTask.set({
+            id: t.id,
+            title: t.title,
+            description: t.description || '',
+            status: t.status,
+            priority: t.priority,
+            timeLogged: (t.totalTimeLogged || 0) / 60,
+            isActive: t.status === 'IN_PROGRESS'
+          });
+          this.isRunning.set(t.status === 'IN_PROGRESS');
+          // Si está pausada, no iniciar timer
+        } else {
+          this.activeTask.set(null);
+          this.isRunning.set(false);
+        }
+      },
+      error: () => {
+        this.activeTask.set(null);
+        this.isRunning.set(false);
+      }
+    });
   }
 
   ngOnDestroy() {
@@ -735,10 +783,12 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
               description: t.description || '',
               status: t.status,
               priority: t.priority,
-              timeLogged: t.totalTimeLogged || 0,
+              timeLogged: (t.totalTimeLogged || 0) / 60, // Convertir minutos a horas
               isActive: false
             }));
           this.availableTasks.set(tasks);
+          // Verificar sesión activa DESPUÉS de cargar las tareas
+          this.checkActiveSession();
         },
         error: (err) => {
           console.error('Error al cargar tareas:', err);
@@ -750,15 +800,17 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
     this.http.get<any[]>(`${environment.apiUrl}/time-logs/today`)
       .subscribe({
         next: (data) => {
-          const entries = data.map(e => ({
-            id: e.id,
-            taskId: e.task?.id,
-            taskTitle: e.task?.title || 'Tarea',
-            startTime: e.startTime,
-            endTime: e.endTime,
-            duration: e.duration ? e.duration / 60 : 0, // de minutos a horas
-            comment: e.description || ''
-          }));
+          const entries = data
+            .filter(e => e.endTime) // Solo mostrar registros finalizados
+            .map(e => ({
+              id: e.id,
+              taskId: e.task?.id,
+              taskTitle: e.task?.title || 'Tarea',
+              startTime: e.startTime,
+              endTime: e.endTime,
+              duration: e.durationMinutes ? e.durationMinutes / 60 : 0, // de minutos a horas
+              comment: ''
+            }));
           this.todayEntries.set(entries);
         },
         error: (err) => {
@@ -787,18 +839,25 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
   startTask(task: TaskForTracking) {
     if (this.activeTask()) return; // Solo una tarea activa
     
-    this.activeTask.set(task);
-    this.sessionStartTime = new Date();
-    this.elapsedSeconds.set(0);
-    this.isRunning.set(true);
-    
-    this.saveSession();
-    this.startTimer();
-    
-    // Notificar al backend
+    // Primero notificar al backend
     this.http.post(`${environment.apiUrl}/time-logs/start/${task.id}`, {})
       .subscribe({ 
-        error: (err) => console.error('Error al iniciar registro:', err) 
+        next: (response) => {
+          console.log('Tarea iniciada en backend:', response);
+          // Solo actualizar UI si el backend respondió OK
+          this.activeTask.set(task);
+          this.sessionStartTime = new Date();
+          this.elapsedSeconds.set(0);
+          this.isRunning.set(true);
+          this.saveSession();
+          this.startTimer();
+          // Recargar tareas para ver el nuevo estado
+          this.loadTasks();
+        },
+        error: (err) => {
+          console.error('Error al iniciar registro:', err);
+          alert('Error al iniciar la tarea: ' + (err.error?.error || err.message || 'Error desconocido'));
+        }
       });
   }
 
@@ -817,8 +876,20 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
   }
 
   resumeTimer() {
-    this.startTimer();
-    this.saveSession();
+    const task = this.activeTask();
+    if (!task) return;
+    // Llama al backend para reanudar (cambia a IN_PROGRESS)
+    this.http.post(`${environment.apiUrl}/time-logs/start/${task.id}`, {}).subscribe({
+      next: () => {
+        this.isRunning.set(true);
+        this.startTimer();
+        this.saveSession();
+        this.loadTasks();
+      },
+      error: (err) => {
+        alert('Error al reanudar la tarea: ' + (err.error?.error || err.message || 'Error desconocido'));
+      }
+    });
   }
 
   clearTimer() {
@@ -857,19 +928,49 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
     this.http.post(`${environment.apiUrl}/time-logs/stop`, {
       description: this.finishComment
     }).subscribe({
-        next: () => {
+        next: (response) => {
+          console.log('Sesión finalizada:', response);
+          
           // Si se marca como completada, actualizar la tarea
           if (this.markAsCompleted) {
-            this.http.put(`${environment.apiUrl}/tasks/${task.id}`, { status: 'COMPLETED' })
-              .subscribe({ error: (err) => console.error('Error al completar tarea:', err) });
+            this.http.post(`${environment.apiUrl}/tasks/${task.id}/complete`, {})
+              .subscribe({ 
+                next: () => {
+                  console.log('Tarea marcada como completada');
+                  this.resetSession();
+                },
+                error: (err) => {
+                  console.error('Error al completar tarea:', err);
+                  this.resetSession();
+                }
+              });
+          } else {
+            this.resetSession();
           }
-          this.resetSession();
         },
         error: (err) => {
           console.error('Error al detener registro:', err);
           this.resetSession();
         }
       });
+  }
+
+  cancelActiveSession() {
+    if (!confirm('¿Cancelar sesión activa? El tiempo no se guardará.')) {
+      return;
+    }
+
+    this.http.delete(`${environment.apiUrl}/time-logs/cancel-active`).subscribe({
+      next: () => {
+        console.log('Sesión cancelada');
+        this.resetSession();
+      },
+      error: (err) => {
+        console.error('Error al cancelar sesión:', err);
+        // Intentar limpiar de todas formas
+        this.resetSession();
+      }
+    });
   }
 
   resetSession() {
@@ -879,6 +980,7 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
     this.elapsedSeconds.set(0);
     this.isRunning.set(false);
     this.closeFinishModal();
+    this.checkBackendActiveSession();
     this.loadTasks();
     this.loadTodayEntries();
   }
